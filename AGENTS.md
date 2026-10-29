@@ -28,14 +28,13 @@ cannot resolve that check from PATH.
   `Required` by default but `NotUsable` under the flags is not forced in, so the choices still `Match`.
 - `pluginIndex` keeps `Match` and `Resolve` linear in a group's plugin count; `TestLargeGroupIsLinear` compares a
   ratio, not a wall-clock time.
-- `gameDepOK` orders versions with `semverish.CompareDotNet`, and a version it cannot order counts as met. That policy
-  is FOMOD semantics owned here, not the comparator's. `EvalContext.GameVersion` must carry all the parts the game
-  reports, because a missing part orders below zero.
+- `gameDepOK` orders versions with `semverish.Compare`, and a version it cannot order counts as met. That policy is
+  FOMOD semantics owned here, not the comparator's.
 - `Find` resolves names with `safefs.ResolveFold` on a `fs.Sub` of each folder it visits, so a case-variant sibling
   cannot redirect the lookup, and joins with `path.Join`: `"./fomod"` fails `fs.ValidPath` at the root.
 - `Keep` visits each step and group name once, so a config that repeats a name still gets an idempotent result.
 - `testdata/behaviour.golden` pins every evaluator function over fixtures, choice sets and contexts. Regenerate it
-  with `FOMOD_RECORD=1` only for an intended change, and list the rows that move by name in `comparatorRow`.
+  with `FOMOD_RECORD=1` only for an intended change.
 
 ## Files
 

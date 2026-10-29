@@ -27,7 +27,7 @@ func main() {
 	if !ok {
 		log.Fatal("not a FOMOD archive")
 	}
-	ctx := fomod.EvalContext{GameVersion: "1.6.15.0"}
+	ctx := fomod.EvalContext{GameVersion: "1.6.15"}
 	choices := fomod.Choices{"Options": {"Pack": {"Beta"}}}
 	if !fomod.Match(cfg, choices, ctx) {
 		log.Fatal("the choices no longer fit this config: ask again")
@@ -46,7 +46,7 @@ func main() {
 | `Open` read | Reads at most a fixed cap and fails with `ErrTooLarge` past it, so a caller can tell an oversized config from a malformed one |
 | `Parse` | Takes the raw file bytes and decides the encoding from them: BOM, then NUL bytes for BOM-less UTF-16, then Windows-1252 for bytes that are not UTF-8. The declared encoding is ignored |
 | `Parse` order | Steps, groups and plugins come back sorted by their `order` attribute (absent or unknown means `Ascending`); `Explicit` keeps document order. Names compare as UTF-16 code units, case-sensitively |
-| `EvalContext.GameVersion` | The game executable's file version with all its parts. A minimum with more parts than the installed version is unmet. `""` makes every game dependency unmet; a version that cannot be ordered counts as met |
+| `EvalContext.GameVersion` | The installed game version, ordered against each gameDependency minimum by go-semverish (a missing number is 0). `""` makes every game dependency unmet; a version that cannot be ordered counts as met |
 | `EvalContext.Files` | The host's view of the installed game. `nil` reports every file `Missing`. The module never touches a disk |
 | `Resolve` | Required files, chosen plugins, `Required` plugins under the live flags, unchosen plugins' `alwaysInstall` and usable `installIfUsable` files, then matching conditional installs, stably sorted by priority. It never copies and never checks that a source exists |
 | `Match` | False when a choice names a plugin that is gone or `NotUsable` under the flags, or a visible group's type is not satisfied |

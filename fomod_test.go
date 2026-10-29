@@ -516,17 +516,18 @@ func TestParseBoundsNesting(t *testing.T) {
 	}
 }
 
-func TestGameDepComparesAllParts(t *testing.T) {
+func TestGameDepComparison(t *testing.T) {
 	for _, c := range []struct {
 		installed, minimum string
 		want               bool
 	}{
 		{"1.6.15", "1.6.0", true},
 		{"1.6.15.0", "1.6.15.0", true},
-		{"1.6.15", "1.6.15.0", false},
+		{"1.6.15", "1.6.15.0", true},
 		{"1.5.0.0", "1.6.0", false},
-		{"1.6.15-beta", "9.0", true},
-		{"1.6.15", "v1.7.0", true},
+		{"1.6.15-beta", "9.0", false},
+		{"1.6.15", "v1.7.0", false},
+		{"not a version", "1.0", true},
 		{"", "1.0", false},
 		{"1.0", "", true},
 	} {

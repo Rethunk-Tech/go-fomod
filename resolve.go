@@ -79,7 +79,7 @@ func gameDepOK(installed, minimum string) bool {
 	if installed == "" {
 		return false
 	}
-	c, ok := semverish.CompareDotNet(installed, minimum)
+	c, ok := semverish.Compare(installed, minimum)
 	return !ok || c >= 0
 }
 

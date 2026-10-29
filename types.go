@@ -53,9 +53,9 @@ type FileIndex func(name string) string
 type EvalContext struct {
 	// Files answers fileDependency checks; nil reports every file FileMissing.
 	Files FileIndex
-	// GameVersion is the game executable's file version with all its parts, as Vortex passes it. A gameDependency
-	// minimum with more parts than this value is unmet, because a missing part orders below zero. "" means unknown,
-	// and any gameDependency is then unmet.
+	// GameVersion is the installed game's version, compared with each gameDependency minimum by go-semverish: a missing
+	// number counts as 0. "" means unknown, and any gameDependency is then unmet; a version either side that does not
+	// parse counts as met.
 	GameVersion string
 }
 

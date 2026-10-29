@@ -11,7 +11,7 @@ import (
 )
 
 // The behaviour table pins what every evaluator function returns for a set of configs, choices and contexts, so a
-// refactor or a comparator change shows up as a named row. Regenerate testdata/behaviour.golden with
+// refactor shows up as a named row. Regenerate testdata/behaviour.golden with
 // FOMOD_RECORD=1 go test -run TestBehaviourTable only when a difference is intended.
 
 const (
@@ -164,13 +164,6 @@ func snapshot(name string, cfg Config) map[string]string {
 	return out
 }
 
-// comparatorRows are the rows whose answer differs from the table's source because gameDependency now orders versions
-// with CompareDotNet: a four-part minimum against the three-part installed version is unmet, where a missing part
-// used to count as zero.
-func comparatorRow(key string) bool {
-	return strings.HasPrefix(key, "game-four-part-minimum|") && strings.Contains(key, "|v=1.6.15|")
-}
-
 func TestBehaviourTable(t *testing.T) {
 	got := map[string]string{}
 	for _, c := range behaviourConfigs(t) {
@@ -203,18 +196,9 @@ func TestBehaviourTable(t *testing.T) {
 	if len(want) != len(got) {
 		t.Fatalf("table has %d rows, golden %d", len(got), len(want))
 	}
-	changed := 0
 	for k, w := range want {
-		if got[k] == w {
-			continue
-		}
-		if !comparatorRow(k) {
+		if got[k] != w {
 			t.Errorf("%s\n  got  %s\n  want %s", k, got[k], w)
-			continue
 		}
-		changed++
-	}
-	if changed == 0 {
-		t.Error("the four-part minimum rows no longer differ: the allowed difference is stale")
 	}
 }
