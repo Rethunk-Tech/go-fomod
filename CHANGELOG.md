@@ -6,4 +6,13 @@ Notable changes to `go-fomod`. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `Parse` reads a `ModuleConfig.xml` in UTF-8, UTF-16 or Windows-1252, whatever it declares, and applies the `order`
+  attribute to steps, groups and plugins.
+- `Find` and `Open` locate and read the config in any `fs.FS`, with a read cap and `ErrTooLarge`.
+- `Composite.Eval`, `PluginType`, `VisibleSteps` and `FlagsFrom` evaluate flag, file and game-version conditions.
+- `Resolve` lists the file and folder operations for a set of `Choices`; `Match`, `Unanswered` and `Keep` replay
+  recorded choices against a changed config.
+
 [Unreleased]: https://github.com/Rethunk-Tech/go-fomod/commits/main
