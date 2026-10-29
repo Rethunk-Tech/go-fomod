@@ -6,6 +6,8 @@ Notable changes to `go-fomod`. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-29
+
 ### Added
 
 - `Parse` reads a `ModuleConfig.xml` in UTF-8, UTF-16 or Windows-1252, whatever it declares, and applies the `order`
@@ -15,4 +17,5 @@ Notable changes to `go-fomod`. The format follows
 - `Resolve` lists the file and folder operations for a set of `Choices`; `Match`, `Unanswered` and `Keep` replay
   recorded choices against a changed config.
 
-[Unreleased]: https://github.com/Rethunk-Tech/go-fomod/commits/main
+[Unreleased]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Rethunk-Tech/go-fomod/releases/tag/v0.1.0
