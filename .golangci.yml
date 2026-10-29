@@ -11,6 +11,7 @@ linters:
     - canonicalheader
     - containedctx
     - contextcheck
+    - depguard
     - dogsled
     - durationcheck
     - errorlint
@@ -59,6 +60,16 @@ linters:
   exclusions:
     generated: lax
   settings:
+    # canon go-golangci-lint-00002; the deviation is declared in canon.toml
+    depguard:
+      rules:
+        no-os-paths:
+          files: ["!$test"]
+          deny:
+            - pkg: "os"
+              desc: "callers pass an fs.FS; the module touches no OS path"
+            - pkg: "path/filepath"
+              desc: "paths inside an fs.FS are slash paths: use path"
     # canon go-golangci-lint-00008
     govet:
       enable-all: true

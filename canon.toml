@@ -1,1 +1,7 @@
 reconciled = "canon v0.1.0-poc"
+
+[deviations]
+# The module reads files only through the caller's fs.FS, so its tests need no
+# Windows leg. That holds only while production code imports neither os nor
+# path/filepath, which depguard enforces.
+"go-golangci-lint-00002" = ".golangci.yml enables depguard to keep os and path/filepath out of production code, which is what makes the ubuntu-only test job sound"
