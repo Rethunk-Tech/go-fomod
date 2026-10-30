@@ -23,7 +23,8 @@ cannot resolve that check from PATH.
   untrusted archive. It is far above any real config, and a UTF-16 file decodes to at most 1.5 times its size, so the
   parser's input is bounded as well.
 - `Parse` applies `order` to steps, groups and plugins, comparing names as UTF-16 code units, case-sensitively, as
-  Qt's `QString` does in Mod Organizer 2. Consumers never sort.
+  Qt's `QString` does in Mod Organizer 2. Consumers never sort. Groups are sorted too, because the schema declares
+  `order` on them, although Mod Organizer 2 leaves groups in document order.
 - `selected` judges `Required` under the flags in force when the group is reached, as the spec does. A plugin that is
   `Required` by default but `NotUsable` under the flags is not forced in, so the choices still `Match`.
 - `pluginIndex` keeps `Match` and `Resolve` linear in a group's plugin count; `TestLargeGroupIsLinear` compares a
