@@ -239,8 +239,11 @@ func TestLargeGroupIsLinear(t *testing.T) {
 		return time.Since(start)
 	}
 	// A ratio rather than a wall-clock limit, so a loaded runner passes: 8x the plugins costs about 8x when linear
-	// and 64x when quadratic.
-	small, large := run(5000), run(40000)
+	// and 64x when quadratic. The fastest of three runs per size keeps one GC pause or stall from skewing it.
+	fastest := func(n int) time.Duration {
+		return min(run(n), run(n), run(n))
+	}
+	small, large := fastest(5000), fastest(40000)
 	if ratio := float64(large) / float64(small); ratio > 24 {
 		t.Fatalf("8x the plugins took %.1fx as long (%v vs %v)", ratio, large, small)
 	}
