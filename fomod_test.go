@@ -13,7 +13,6 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
-	"time"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -220,7 +219,7 @@ func TestRequiredPluginNotUsableUnderFlagsMatches(t *testing.T) {
 }
 
 func TestLargeGroupIsLinear(t *testing.T) {
-	run := func(n int) time.Duration {
+	perOp := func(n int) float64 {
 		g := Group{Name: "G", Type: SelectAny}
 		names := make([]string, n)
 		for i := range n {
@@ -229,23 +228,26 @@ func TestLargeGroupIsLinear(t *testing.T) {
 		}
 		cfg := Config{Steps: []Step{{Name: "S", Groups: []Group{g}}}}
 		choices := Choices{"S": {"G": names}}
-		start := time.Now()
 		if !Match(cfg, choices, EvalContext{}) {
 			t.Fatal("no match")
 		}
 		if got := len(Resolve(cfg, choices, EvalContext{})); got != n {
 			t.Fatalf("ops = %d", got)
 		}
-		return time.Since(start)
+		r := testing.Benchmark(func(b *testing.B) {
+			for b.Loop() {
+				Match(cfg, choices, EvalContext{})
+				Resolve(cfg, choices, EvalContext{})
+			}
+		})
+		return float64(r.T) / float64(r.N)
 	}
 	// A ratio rather than a wall-clock limit, so a loaded runner passes: 8x the plugins costs about 8x when linear
-	// and 64x when quadratic. The fastest of three runs per size keeps one GC pause or stall from skewing it.
-	fastest := func(n int) time.Duration {
-		return min(run(n), run(n), run(n))
-	}
-	small, large := fastest(5000), fastest(40000)
-	if ratio := float64(large) / float64(small); ratio > 24 {
-		t.Fatalf("8x the plugins took %.1fx as long (%v vs %v)", ratio, large, small)
+	// and 64x when quadratic. testing.Benchmark collects garbage before timing and averages over many runs, so the
+	// setup's garbage and one stall on a busy runner do not count against the larger size.
+	small, large := perOp(5000), perOp(40000)
+	if ratio := large / small; ratio > 24 {
+		t.Fatalf("8x the plugins took %.1fx as long (%.0fns vs %.0fns per run)", ratio, large, small)
 	}
 }
 
