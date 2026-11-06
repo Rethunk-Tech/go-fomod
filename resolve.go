@@ -216,32 +216,7 @@ func Resolve(cfg Config, choices Choices, ctx EvalContext) []Op {
 			continue
 		}
 		for _, g := range s.Groups {
-			chosen := selected(choices, s.Name, g.Name, g, flags, ctx)
-			idx := pluginIndex(g)
-			chosenSet := make(map[string]bool, len(chosen))
-			for _, name := range chosen {
-				chosenSet[name] = true
-				i, ok := idx[name]
-				if !ok {
-					continue
-				}
-				p := g.Plugins[i]
-				ops = append(ops, p.Files...)
-				for _, f := range p.Flags {
-					flags[f.Name] = f.Value
-				}
-			}
-			for _, p := range g.Plugins {
-				if chosenSet[p.Name] {
-					continue
-				}
-				usable := PluginType(p, flags, ctx) != TypeNotUsable
-				for _, f := range p.Files {
-					if f.Always || (f.IfUsable && usable) {
-						ops = append(ops, f)
-					}
-				}
-			}
+			ops = resolveGroup(ops, flags, choices, s.Name, g, ctx)
 		}
 	}
 	for _, c := range cfg.Conditionals {
@@ -250,6 +225,38 @@ func Resolve(cfg Config, choices Choices, ctx EvalContext) []Op {
 		}
 	}
 	slices.SortStableFunc(ops, func(a, b Op) int { return cmp.Compare(a.Priority, b.Priority) })
+	return ops
+}
+
+// resolveGroup appends the files of g's chosen plugins and of its unchosen plugins that install regardless, and sets the
+// flags the chosen plugins raise.
+func resolveGroup(ops []Op, flags map[string]string, choices Choices, step string, g Group, ctx EvalContext) []Op {
+	chosen := selected(choices, step, g.Name, g, flags, ctx)
+	idx := pluginIndex(g)
+	chosenSet := make(map[string]bool, len(chosen))
+	for _, name := range chosen {
+		chosenSet[name] = true
+		i, ok := idx[name]
+		if !ok {
+			continue
+		}
+		p := g.Plugins[i]
+		ops = append(ops, p.Files...)
+		for _, f := range p.Flags {
+			flags[f.Name] = f.Value
+		}
+	}
+	for _, p := range g.Plugins {
+		if chosenSet[p.Name] {
+			continue
+		}
+		usable := PluginType(p, flags, ctx) != TypeNotUsable
+		for _, f := range p.Files {
+			if f.Always || (f.IfUsable && usable) {
+				ops = append(ops, f)
+			}
+		}
+	}
 	return ops
 }
 

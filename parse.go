@@ -252,35 +252,8 @@ func (c *Composite) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 		}
 		switch t := tok.(type) {
 		case xml.StartElement:
-			switch t.Name.Local {
-			case "fileDependency":
-				var v FileDep
-				if err := d.DecodeElement(&v, &t); err != nil {
-					return err
-				}
-				c.Files = append(c.Files, v)
-			case "flagDependency":
-				var v FlagDep
-				if err := d.DecodeElement(&v, &t); err != nil {
-					return err
-				}
-				c.Flags = append(c.Flags, v)
-			case "gameDependency":
-				var v GameDep
-				if err := d.DecodeElement(&v, &t); err != nil {
-					return err
-				}
-				c.Games = append(c.Games, v)
-			case "dependencies", "visible", "compositeDependency":
-				var n Composite
-				if err := d.DecodeElement(&n, &t); err != nil {
-					return err
-				}
-				c.Nested = append(c.Nested, n)
-			default:
-				if err := d.Skip(); err != nil {
-					return err
-				}
+			if err := decodeChild(c, d, t); err != nil {
+				return err
 			}
 		case xml.EndElement:
 			if t.Name.Local == start.Name.Local {
@@ -288,6 +261,31 @@ func (c *Composite) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 			}
 		}
 	}
+}
+
+// decodeChild decodes one child of a composite into the list its tag names, skipping any other tag.
+func decodeChild(c *Composite, d *xml.Decoder, t xml.StartElement) error {
+	switch t.Name.Local {
+	case "fileDependency":
+		return decodeInto(d, t, &c.Files)
+	case "flagDependency":
+		return decodeInto(d, t, &c.Flags)
+	case "gameDependency":
+		return decodeInto(d, t, &c.Games)
+	case "dependencies", "visible", "compositeDependency":
+		return decodeInto(d, t, &c.Nested)
+	default:
+		return d.Skip()
+	}
+}
+
+func decodeInto[T any](d *xml.Decoder, t xml.StartElement, dst *[]T) error {
+	var v T
+	if err := d.DecodeElement(&v, &t); err != nil {
+		return err
+	}
+	*dst = append(*dst, v)
+	return nil
 }
 
 func (f *FileDep) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
