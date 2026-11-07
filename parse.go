@@ -78,14 +78,24 @@ func sortByOrder[T any](items []T, order string, name func(T) string) {
 	if order == OrderExplicit {
 		return
 	}
-	key := func(t T) []uint16 { return utf16.Encode([]rune(name(t))) }
-	slices.SortStableFunc(items, func(a, b T) int {
-		c := slices.Compare(key(a), key(b))
+	type keyed struct {
+		item T
+		key  []uint16
+	}
+	ks := make([]keyed, len(items))
+	for i, t := range items {
+		ks[i] = keyed{t, utf16.Encode([]rune(name(t)))}
+	}
+	slices.SortStableFunc(ks, func(a, b keyed) int {
+		c := slices.Compare(a.key, b.key)
 		if order == OrderDescending {
 			return -c
 		}
 		return c
 	})
+	for i, k := range ks {
+		items[i] = k.item
+	}
 }
 
 // charsetReader accepts any declared label: Parse has already made the bytes UTF-8 (decodeXML, then the
