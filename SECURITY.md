@@ -29,5 +29,6 @@ Please do not open a public issue for a suspected vulnerability first.
 - Resolving an `Op.Source` or `Op.Destination` against a disk. The caller must refuse `..`, absolute paths and links
   that leave the install root, and check that a source exists.
 - The `fs.FS` itself: the caller confines it to the extracted archive.
-- A config that is valid XML but asks for odd installs (an empty `Required` list, a repeated plugin name, a priority
-  at the integer limits) is handled as the spec describes; it is the caller's policy whether to install it.
+- A config that is valid XML but asks for odd installs (an empty `Required` list, a priority
+  at the integer limits) is handled as the spec describes; it is the caller's policy whether to install it. A choice that names a
+  plugin twice is not such a config: `Match` refuses it and `Resolve` installs the plugin once.
