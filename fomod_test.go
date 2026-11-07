@@ -3,6 +3,7 @@ package fomod
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io/fs"
 	"math"
 	"os"
@@ -552,5 +553,35 @@ func TestKeepIsIdempotentForRepeatedNames(t *testing.T) {
 	once := Keep(cfg, Choices{"S": {"G": {"a"}}})
 	if twice := Keep(cfg, once); !reflect.DeepEqual(once, twice) || len(once["S"]["G"]) != 1 {
 		t.Fatalf("Keep = %v then %v", once, twice)
+	}
+}
+
+func TestRepeatedChoiceIsRefusedAndInstallsOnce(t *testing.T) {
+	cfg, err := Parse([]byte(`<config><installSteps><installStep name="S"><optionalFileGroups>` +
+		`<group name="G" type="SelectAny"><plugins><plugin name="P"><files><file source="x" destination="y"/></files></plugin>` +
+		`</plugins></group></optionalFileGroups></installStep></installSteps></config>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rep := Choices{"S": {"G": {"P", "P", "P"}}}
+	if Match(cfg, rep, EvalContext{}) {
+		t.Fatal("Match accepted a plugin named three times")
+	}
+	if ops := Resolve(cfg, rep, EvalContext{}); len(ops) != 1 {
+		t.Fatalf("Resolve returned %d ops for a repeated name, want 1", len(ops))
+	}
+}
+
+func TestSortByOrderAllocatesPerItemNotPerComparison(t *testing.T) {
+	names := make([]string, 1000)
+	for i := range names {
+		names[i] = fmt.Sprintf("plugin-%04d", 999-i)
+	}
+	allocs := testing.AllocsPerRun(3, func() {
+		items := slices.Clone(names)
+		sortByOrder(items, OrderAscending, func(s string) string { return s })
+	})
+	if limit := float64(4 * len(names)); allocs > limit {
+		t.Fatalf("sortByOrder made %v allocations for %d items, limit %v", allocs, len(names), limit)
 	}
 }

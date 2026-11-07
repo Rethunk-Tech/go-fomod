@@ -147,10 +147,13 @@ func selected(choices Choices, step, group string, g Group, flags map[string]str
 		}
 		return names
 	}
-	names := slices.Clone(choices[step][group])
-	have := make(map[string]bool, len(names))
-	for _, n := range names {
-		have[n] = true
+	have := make(map[string]bool, len(choices[step][group]))
+	names := make([]string, 0, len(choices[step][group]))
+	for _, n := range choices[step][group] {
+		if !have[n] {
+			have[n] = true
+			names = append(names, n)
+		}
 	}
 	for _, p := range g.Plugins {
 		if !have[p.Name] && PluginType(p, flags, ctx) == TypeRequired {
@@ -169,6 +172,9 @@ func Match(cfg Config, choices Choices, ctx EvalContext) bool {
 			continue
 		}
 		for _, g := range s.Groups {
+			if !strings.EqualFold(g.Type, SelectAll) && hasRepeat(choices[s.Name][g.Name]) {
+				return false
+			}
 			got := selected(choices, s.Name, g.Name, g, flags, ctx)
 			if !groupOK(g, got) {
 				return false
@@ -188,6 +194,18 @@ func Match(cfg Config, choices Choices, ctx EvalContext) bool {
 		}
 	}
 	return true
+}
+
+// hasRepeat reports a name chosen twice, which would install its files twice.
+func hasRepeat(names []string) bool {
+	seen := make(map[string]bool, len(names))
+	for _, n := range names {
+		if seen[n] {
+			return true
+		}
+		seen[n] = true
+	}
+	return false
 }
 
 func groupOK(g Group, names []string) bool {
