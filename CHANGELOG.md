@@ -6,6 +6,13 @@ Notable changes to `go-fomod`. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-07
+
+### Fixed
+
+- A plugin named twice in a group is refused and installs once.
+- `Parse` computes each sort key once, so a config with many plugins sorts in linear time.
+
 ## [0.1.0] - 2026-10-29
 
 ### Added
@@ -17,5 +24,6 @@ Notable changes to `go-fomod`. The format follows
 - `Resolve` lists the file and folder operations for a set of `Choices`; `Match`, `Unanswered` and `Keep` replay
   recorded choices against a changed config.
 
-[Unreleased]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Rethunk-Tech/go-fomod/releases/tag/v0.1.0
