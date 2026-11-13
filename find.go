@@ -14,6 +14,13 @@ import (
 // ErrTooLarge is returned by Open for a config larger than the read cap.
 var ErrTooLarge = errors.New("fomod: config exceeds the read cap")
 
+// ErrTooComplex is returned by Parse for a document with more markup than any real config; each empty element
+// allocates about 2 KiB, so the read cap alone would let a small file claim gigabytes.
+var ErrTooComplex = errors.New("fomod: config has too many elements")
+
+// maxMarkup bounds the '<' count of a document, an upper bound on its elements, comments and declarations.
+const maxMarkup = 1 << 17
+
 const configPath = "fomod/moduleconfig.xml"
 
 // maxConfigBytes bounds a ModuleConfig.xml read from an untrusted archive; real configs are orders of magnitude

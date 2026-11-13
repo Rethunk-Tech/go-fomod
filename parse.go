@@ -16,6 +16,9 @@ import (
 func Parse(data []byte) (Config, error) {
 	var raw xmlConfig
 	data = decodeLegacy(decodeXML(data))
+	if bytes.Count(data, []byte("<")) > maxMarkup {
+		return Config{}, ErrTooComplex
+	}
 	dec := xml.NewDecoder(bytes.NewReader(data))
 	dec.CharsetReader = charsetReader
 	if err := dec.Decode(&raw); err != nil {

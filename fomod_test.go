@@ -585,3 +585,10 @@ func TestSortByOrderAllocatesPerItemNotPerComparison(t *testing.T) {
 		t.Fatalf("sortByOrder made %v allocations for %d items, limit %v", allocs, len(names), limit)
 	}
 }
+
+func TestParseBoundsElementCount(t *testing.T) {
+	doc := "<config><installSteps>" + strings.Repeat("<installStep/>", maxMarkup+1) + "</installSteps></config>"
+	if _, err := Parse([]byte(doc)); !errors.Is(err, ErrTooComplex) {
+		t.Fatalf("err = %v, want ErrTooComplex", err)
+	}
+}
