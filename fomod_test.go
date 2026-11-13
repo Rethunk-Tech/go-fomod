@@ -613,3 +613,12 @@ func TestOpEscapes(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveSafeSeparatesEscapingOps(t *testing.T) {
+	bad := "../../x"
+	cfg := Config{Required: []Op{{Source: "ok.esp"}, {Source: "a", Destination: &bad}, {Source: "/etc/passwd"}}}
+	ops, skipped := ResolveSafe(cfg, Choices{}, EvalContext{})
+	if len(ops) != 1 || ops[0].Source != "ok.esp" || len(skipped) != 2 {
+		t.Fatalf("ops = %+v, skipped = %+v", ops, skipped)
+	}
+}

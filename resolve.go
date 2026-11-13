@@ -224,6 +224,19 @@ func groupOK(g Group, names []string) bool {
 	}
 }
 
+// ResolveSafe is Resolve with every operation that Escapes taken out of ops and returned in skipped, so a caller that
+// never checks Escapes cannot be sent outside the archive or install root.
+func ResolveSafe(cfg Config, choices Choices, ctx EvalContext) (ops, skipped []Op) {
+	for _, op := range Resolve(cfg, choices, ctx) {
+		if op.Escapes() {
+			skipped = append(skipped, op)
+		} else {
+			ops = append(ops, op)
+		}
+	}
+	return ops, skipped
+}
+
 // Resolve lists file operations for required files, selected plugins, and matching conditional installs.
 func Resolve(cfg Config, choices Choices, ctx EvalContext) []Op {
 	var ops []Op
