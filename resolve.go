@@ -142,9 +142,8 @@ func pluginIndex(g Group) map[string]int {
 // every plugin, so two that share a name are both installed. unknown counts the chosen names g has no plugin for.
 func selected(choices Choices, step string, g Group, flags map[string]string, ctx EvalContext) (picked []int, unknown int) {
 	if strings.EqualFold(g.Type, SelectAll) {
-		picked = make([]int, len(g.Plugins))
-		for i := range picked {
-			picked[i] = i
+		for i := range g.Plugins {
+			picked = append(picked, i)
 		}
 		return picked, 0
 	}
