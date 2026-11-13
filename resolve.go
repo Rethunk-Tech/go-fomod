@@ -111,20 +111,22 @@ func FlagsFrom(cfg Config, choices Choices, ctx EvalContext) map[string]string {
 			continue
 		}
 		for _, g := range s.Groups {
-			idx := pluginIndex(g)
-			for _, name := range selected(choices, s.Name, g.Name, g, flags, ctx) {
-				i, ok := idx[name]
-				if !ok {
-					continue
-				}
-				p := g.Plugins[i]
-				for _, f := range p.Flags {
-					flags[f.Name] = f.Value
-				}
-			}
+			raiseFlags(flags, choices, s.Name, g, ctx)
 		}
 	}
 	return flags
+}
+
+// raiseFlags sets the flags of g's selected plugins.
+func raiseFlags(flags map[string]string, choices Choices, step string, g Group, ctx EvalContext) {
+	idx := pluginIndex(g)
+	for _, name := range selected(choices, step, g.Name, g, flags, ctx) {
+		if i, ok := idx[name]; ok {
+			for _, f := range g.Plugins[i].Flags {
+				flags[f.Name] = f.Value
+			}
+		}
+	}
 }
 
 // pluginIndex maps each plugin name of g to its position; a repeated name keeps the first.
@@ -300,14 +302,17 @@ func Unanswered(old, cfg Config, choices Choices, ctx EvalContext) bool {
 			seen[[2]string{s.Name, g.Name}] = true
 		}
 	}
-	for _, s := range VisibleSteps(cfg, FlagsFrom(cfg, choices, ctx), ctx) {
+	// Visibility is judged where the installer reaches each step, under the flags raised before it.
+	flags := map[string]string{}
+	for _, s := range cfg.Steps {
+		if !s.Visible.Eval(flags, ctx) {
+			continue
+		}
 		for _, g := range s.Groups {
-			if strings.EqualFold(g.Type, SelectAll) || seen[[2]string{s.Name, g.Name}] {
-				continue
-			}
-			if _, ok := choices[s.Name][g.Name]; !ok {
+			if _, ok := choices[s.Name][g.Name]; !ok && !strings.EqualFold(g.Type, SelectAll) && !seen[[2]string{s.Name, g.Name}] {
 				return true
 			}
+			raiseFlags(flags, choices, s.Name, g, ctx)
 		}
 	}
 	return false

@@ -622,3 +622,19 @@ func TestResolveSafeSeparatesEscapingOps(t *testing.T) {
 		t.Fatalf("ops = %+v, skipped = %+v", ops, skipped)
 	}
 }
+
+// A later step's flag can hide an earlier step; the installer still showed it, so its new group is unanswered.
+func TestUnansweredJudgesVisibilityWhereTheStepIsReached(t *testing.T) {
+	cfg, err := Parse([]byte(`<config><installSteps order="Explicit">` +
+		`<installStep name="A"><visible><flagDependency flag="X" value=""/></visible><optionalFileGroups>` +
+		`<group name="New" type="SelectAny"><plugins><plugin name="p"/></plugins></group></optionalFileGroups></installStep>` +
+		`<installStep name="B"><optionalFileGroups><group name="G" type="SelectAll"><plugins>` +
+		`<plugin name="set"><conditionFlags><flag name="X">on</flag></conditionFlags></plugin>` +
+		`</plugins></group></optionalFileGroups></installStep></installSteps></config>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !Unanswered(Config{}, cfg, Choices{}, EvalContext{}) {
+		t.Fatal("step A was shown but its group was not reported")
+	}
+}
