@@ -2,6 +2,7 @@ package fomod
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -25,8 +26,7 @@ func Parse(data []byte) (Config, error) {
 		return Config{}, fmt.Errorf("fomod: %w", err)
 	}
 	cfg := Config{ModuleName: strings.TrimSpace(raw.ModuleName), StepOrder: normOrder(raw.Steps.Order)}
-	cfg.Required = appendOps(nil, raw.Required.Files, false)
-	cfg.Required = appendOps(cfg.Required, raw.Required.Folders, true)
+	cfg.Required = appendOps(nil, raw.Required.items)
 	for _, s := range raw.Steps.Steps {
 		st := Step{Name: s.Name, Visible: s.Visible.Composite, GroupOrder: normOrder(s.Groups.Order)}
 		for _, g := range s.Groups.Groups {
@@ -40,8 +40,7 @@ func Parse(data []byte) (Config, error) {
 					TypeName:    p.Type.Type.Name,
 					DefaultType: p.Type.Dependency.Default.Name,
 				}
-				pl.Files = appendOps(pl.Files, p.Files.Files, false)
-				pl.Files = appendOps(pl.Files, p.Files.Folders, true)
+				pl.Files = appendOps(pl.Files, p.Files.items)
 				for _, pat := range p.Type.Dependency.Patterns.Patterns {
 					pl.Patterns = append(pl.Patterns, TypePattern{Type: pat.Dependencies.Composite, Name: pat.Type.Name})
 				}
@@ -56,8 +55,7 @@ func Parse(data []byte) (Config, error) {
 	sortByOrder(cfg.Steps, cfg.StepOrder, func(s Step) string { return s.Name })
 	for _, p := range raw.Conditionals.Patterns.Patterns {
 		c := Conditional{When: p.Dependencies.Composite}
-		c.Files = appendOps(c.Files, p.Files.Files, false)
-		c.Files = appendOps(c.Files, p.Files.Folders, true)
+		c.Files = appendOps(c.Files, p.Files.items)
 		cfg.Conditionals = append(cfg.Conditionals, c)
 	}
 	return cfg, nil
@@ -115,17 +113,22 @@ func flagSets(flags []xmlFlag) []FlagSet {
 	return out
 }
 
-func appendOps(dst []Op, items []xmlFile, folder bool) []Op {
+func appendOps(dst []Op, items []xmlFile) []Op {
+	n := len(dst)
 	for _, it := range items {
 		dst = append(dst, Op{
 			Source:      it.Source,
 			Destination: it.Destination,
 			Priority:    atoi(it.Priority),
-			Folder:      folder,
+			Folder:      it.folder,
 			Always:      isTrue(it.AlwaysInstall),
 			IfUsable:    isTrue(it.InstallIfUsable),
 		})
 	}
+	// Higher priority overwrites, so it sorts later; equals keep document order.
+	slices.SortStableFunc(dst[n:], func(a, b Op) int {
+		return cmp.Compare(a.Priority, b.Priority)
+	})
 	return dst
 }
 
@@ -191,8 +194,7 @@ type xmlImage struct {
 }
 
 type xmlFiles struct {
-	Files   []xmlFile `xml:"file"`
-	Folders []xmlFile `xml:"folder"`
+	items []xmlFile
 }
 
 type xmlFile struct {
@@ -201,6 +203,37 @@ type xmlFile struct {
 	Priority        string  `xml:"priority,attr"`
 	AlwaysInstall   string  `xml:"alwaysInstall,attr"`
 	InstallIfUsable string  `xml:"installIfUsable,attr"`
+	folder          bool
+}
+
+// UnmarshalXML keeps file and folder entries in one list so equal-priority ops stay in document order.
+func (f *xmlFiles) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	for {
+		tok, err := d.Token()
+		if err != nil {
+			return err
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			switch t.Name.Local {
+			case "file", "folder":
+				var it xmlFile
+				if err := d.DecodeElement(&it, &t); err != nil {
+					return err
+				}
+				it.folder = t.Name.Local == "folder"
+				f.items = append(f.items, it)
+			default:
+				if err := d.Skip(); err != nil {
+					return err
+				}
+			}
+		case xml.EndElement:
+			if t.Name.Local == start.Name.Local {
+				return nil
+			}
+		}
+	}
 }
 
 type xmlFlags struct {
