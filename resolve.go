@@ -119,12 +119,10 @@ func FlagsFrom(cfg Config, choices Choices, ctx EvalContext) map[string]string {
 
 // raiseFlags sets the flags of g's selected plugins.
 func raiseFlags(flags map[string]string, choices Choices, step string, g Group, ctx EvalContext) {
-	idx := pluginIndex(g)
-	for _, name := range selected(choices, step, g.Name, g, flags, ctx) {
-		if i, ok := idx[name]; ok {
-			for _, f := range g.Plugins[i].Flags {
-				flags[f.Name] = f.Value
-			}
+	picked, _ := selected(choices, step, g, flags, ctx)
+	for _, i := range picked {
+		for _, f := range g.Plugins[i].Flags {
+			flags[f.Name] = f.Value
 		}
 	}
 }
@@ -140,30 +138,35 @@ func pluginIndex(g Group) map[string]int {
 	return idx
 }
 
-// selected lists the chosen plugin names plus the plugins that are Required under flags.
-func selected(choices Choices, step, group string, g Group, flags map[string]string, ctx EvalContext) []string {
+// selected lists the indexes in g of the chosen plugins plus the plugins that are Required under flags; SelectAll picks
+// every plugin, so two that share a name are both installed. unknown counts the chosen names g has no plugin for.
+func selected(choices Choices, step string, g Group, flags map[string]string, ctx EvalContext) (picked []int, unknown int) {
 	if strings.EqualFold(g.Type, SelectAll) {
-		names := make([]string, len(g.Plugins))
-		for i, p := range g.Plugins {
-			names[i] = p.Name
+		picked = make([]int, len(g.Plugins))
+		for i := range picked {
+			picked[i] = i
 		}
-		return names
+		return picked, 0
 	}
-	have := make(map[string]bool, len(choices[step][group]))
-	names := make([]string, 0, len(choices[step][group]))
-	for _, n := range choices[step][group] {
-		if !have[n] {
-			have[n] = true
-			names = append(names, n)
-		}
-	}
-	for _, p := range g.Plugins {
-		if !have[p.Name] && PluginType(p, flags, ctx) == TypeRequired {
-			names = append(names, p.Name)
-			have[p.Name] = true
+	idx := pluginIndex(g)
+	have := make(map[int]bool, len(choices[step][g.Name]))
+	for _, n := range choices[step][g.Name] {
+		i, ok := idx[n]
+		switch {
+		case !ok:
+			unknown++
+		case !have[i]:
+			have[i] = true
+			picked = append(picked, i)
 		}
 	}
-	return names
+	for i, p := range g.Plugins {
+		if !have[i] && PluginType(p, flags, ctx) == TypeRequired {
+			picked = append(picked, i)
+			have[i] = true
+		}
+	}
+	return picked, unknown
 }
 
 // Match reports whether choices still name plugins that exist and satisfy each visible group's type.
@@ -177,19 +180,17 @@ func Match(cfg Config, choices Choices, ctx EvalContext) bool {
 			if !strings.EqualFold(g.Type, SelectAll) && hasRepeat(choices[s.Name][g.Name]) {
 				return false
 			}
-			got := selected(choices, s.Name, g.Name, g, flags, ctx)
-			if !groupOK(g, got) {
+			got, unknown := selected(choices, s.Name, g, flags, ctx)
+			if unknown > 0 || !groupOK(g, len(got)) {
 				return false
 			}
-			idx := pluginIndex(g)
-			for _, name := range got {
-				i, ok := idx[name]
-				if !ok || PluginType(g.Plugins[i], flags, ctx) == TypeNotUsable {
+			for _, i := range got {
+				if PluginType(g.Plugins[i], flags, ctx) == TypeNotUsable {
 					return false
 				}
 			}
-			for _, name := range got {
-				for _, f := range g.Plugins[idx[name]].Flags {
+			for _, i := range got {
+				for _, f := range g.Plugins[i].Flags {
 					flags[f.Name] = f.Value
 				}
 			}
@@ -210,8 +211,7 @@ func hasRepeat(names []string) bool {
 	return false
 }
 
-func groupOK(g Group, names []string) bool {
-	n := len(names)
+func groupOK(g Group, n int) bool {
 	switch {
 	case strings.EqualFold(g.Type, SelectExactlyOne):
 		return n == 1
@@ -264,23 +264,18 @@ func Resolve(cfg Config, choices Choices, ctx EvalContext) []Op {
 // resolveGroup appends the files of g's chosen plugins and of its unchosen plugins that install regardless, and sets the
 // flags the chosen plugins raise.
 func resolveGroup(ops []Op, flags map[string]string, choices Choices, step string, g Group, ctx EvalContext) []Op {
-	chosen := selected(choices, step, g.Name, g, flags, ctx)
-	idx := pluginIndex(g)
-	chosenSet := make(map[string]bool, len(chosen))
-	for _, name := range chosen {
-		chosenSet[name] = true
-		i, ok := idx[name]
-		if !ok {
-			continue
-		}
+	chosen, _ := selected(choices, step, g, flags, ctx)
+	chosenSet := make(map[int]bool, len(chosen))
+	for _, i := range chosen {
+		chosenSet[i] = true
 		p := g.Plugins[i]
 		ops = append(ops, p.Files...)
 		for _, f := range p.Flags {
 			flags[f.Name] = f.Value
 		}
 	}
-	for _, p := range g.Plugins {
-		if chosenSet[p.Name] {
+	for i, p := range g.Plugins {
+		if chosenSet[i] {
 			continue
 		}
 		usable := PluginType(p, flags, ctx) != TypeNotUsable

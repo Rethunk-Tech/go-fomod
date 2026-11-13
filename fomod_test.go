@@ -638,3 +638,22 @@ func TestUnansweredJudgesVisibilityWhereTheStepIsReached(t *testing.T) {
 		t.Fatal("step A was shown but its group was not reported")
 	}
 }
+
+// SelectAll installs every plugin, so two that share a name each install their own files once.
+func TestSelectAllInstallsEachPluginOfARepeatedName(t *testing.T) {
+	cfg, err := Parse([]byte(`<config><installSteps><installStep name="S"><optionalFileGroups>` +
+		`<group name="G" type="SelectAll"><plugins order="Explicit">` +
+		`<plugin name="Core"><files><file source="a" destination="a"/></files></plugin>` +
+		`<plugin name="Core"><files><file source="b" destination="b"/></files></plugin>` +
+		`</plugins></group></optionalFileGroups></installStep></installSteps></config>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, op := range Resolve(cfg, Choices{}, EvalContext{}) {
+		got = append(got, op.Source)
+	}
+	if !slices.Equal(got, []string{"a", "b"}) {
+		t.Fatalf("sources %q", got)
+	}
+}
