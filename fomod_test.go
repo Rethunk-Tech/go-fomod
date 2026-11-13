@@ -592,3 +592,24 @@ func TestParseBoundsElementCount(t *testing.T) {
 		t.Fatalf("err = %v, want ErrTooComplex", err)
 	}
 }
+
+func TestOpEscapes(t *testing.T) {
+	dest := func(s string) *string { return &s }
+	for _, c := range []struct {
+		op   Op
+		want bool
+	}{
+		{Op{Source: "a/b.esp"}, false},
+		{Op{Source: "a..b/c"}, false},
+		{Op{Source: "../x"}, true},
+		{Op{Source: `a\..\..\x`}, true},
+		{Op{Source: "/etc/passwd"}, true},
+		{Op{Source: `C:\x`}, true},
+		{Op{Source: "ok", Destination: dest("../../x")}, true},
+		{Op{Source: "ok", Destination: dest("")}, false},
+	} {
+		if got := c.op.Escapes(); got != c.want {
+			t.Errorf("%+v Escapes = %v, want %v", c.op, got, c.want)
+		}
+	}
+}

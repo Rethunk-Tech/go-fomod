@@ -1,5 +1,10 @@
 package fomod
 
+import (
+	"slices"
+	"strings"
+)
+
 const (
 	SelectExactlyOne = "SelectExactlyOne"
 	SelectAtMostOne  = "SelectAtMostOne"
@@ -130,4 +135,22 @@ type FlagDep struct {
 
 type GameDep struct {
 	Version string
+}
+
+// Escapes reports whether Source or Destination would leave the archive or the install root: absolute, a drive
+// path, or containing a ".." element. FOMOD authors write either separator, so backslashes count as separators.
+// Parse and Resolve pass operands through unchanged; a consumer calls Escapes before touching the filesystem.
+func (o Op) Escapes() bool {
+	if pathEscapes(o.Source) {
+		return true
+	}
+	return o.Destination != nil && pathEscapes(*o.Destination)
+}
+
+func pathEscapes(p string) bool {
+	p = strings.ReplaceAll(p, "\\", "/")
+	if strings.HasPrefix(p, "/") || (len(p) >= 2 && p[1] == ':') {
+		return true
+	}
+	return slices.Contains(strings.Split(p, "/"), "..")
 }
