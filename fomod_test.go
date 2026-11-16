@@ -235,17 +235,22 @@ func TestLargeGroupIsLinear(t *testing.T) {
 		if got := len(Resolve(cfg, choices, EvalContext{})); got != n {
 			t.Fatalf("ops = %d", got)
 		}
-		r := testing.Benchmark(func(b *testing.B) {
-			for b.Loop() {
-				Match(cfg, choices, EvalContext{})
-				Resolve(cfg, choices, EvalContext{})
-			}
-		})
-		return float64(r.T) / float64(r.N)
+		best := math.Inf(1)
+		for range 3 {
+			r := testing.Benchmark(func(b *testing.B) {
+				for b.Loop() {
+					Match(cfg, choices, EvalContext{})
+					Resolve(cfg, choices, EvalContext{})
+				}
+			})
+			best = min(best, float64(r.T)/float64(r.N))
+		}
+		return best
 	}
 	// A ratio rather than a wall-clock limit, so a loaded runner passes: 8x the plugins costs about 8x when linear
 	// and 64x when quadratic. testing.Benchmark collects garbage before timing and averages over many runs, so the
-	// setup's garbage and one stall on a busy runner do not count against the larger size.
+	// setup's garbage does not count against the larger size, and the fastest of three samples discards a stall, which a
+	// 40000-plugin run under -race on a shared runner hits often enough to read 27x for linear code.
 	small, large := perOp(5000), perOp(40000)
 	if ratio := large / small; ratio > 24 {
 		t.Fatalf("8x the plugins took %.1fx as long (%.0fns vs %.0fns per run)", ratio, large, small)
