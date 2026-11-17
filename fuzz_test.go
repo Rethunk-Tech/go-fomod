@@ -2,8 +2,10 @@ package fomod
 
 import (
 	"encoding/binary"
+	"errors"
 	"io/fs"
 	"os"
+	"path"
 	"reflect"
 	"slices"
 	"strings"
@@ -15,6 +17,14 @@ import (
 func FuzzParse(f *testing.F) {
 	seedModuleConfig(f)
 	f.Fuzz(func(t *testing.T, data []byte) {
+		xml := decodeXML(data)
+		if len(xml) > 2*len(data)+16 {
+			t.Fatalf("decodeXML grew %d to %d", len(data), len(xml))
+		}
+		legacy := decodeLegacy(xml)
+		if len(legacy) > 3*len(xml)+16 {
+			t.Fatalf("decodeLegacy grew %d to %d", len(xml), len(legacy))
+		}
 		cfg, err := Parse(data)
 		if err != nil {
 			return
@@ -29,14 +39,112 @@ func FuzzOpen(f *testing.F) {
 		fsys := fstest.MapFS{
 			"fomod/ModuleConfig.xml": &fstest.MapFile{Data: data},
 		}
-		if len(data) > maxConfigBytes {
-			t.Skip()
-		}
 		cfg, _, ok, err := Open(fsys)
+		if len(data) > maxConfigBytes {
+			if !errors.Is(err, ErrTooLarge) {
+				t.Fatalf("Open: %v, want ErrTooLarge", err)
+			}
+			return
+		}
 		if err != nil || !ok {
 			return
 		}
 		assertParsed(t, cfg)
+	})
+}
+
+func FuzzFind(f *testing.F) {
+	for _, c := range [][2]string{
+		{"fomod/ModuleConfig.xml", ""},
+		{"FoMoD/MODULECONFIG.XML", ""},
+		{"My Mod/fomod/ModuleConfig.xml", ""},
+		{"a/b/fomod/ModuleConfig.xml", ""},
+		{"fomod/info.xml", ""},
+		{"../fomod/ModuleConfig.xml", "fomod/ModuleConfig.xml"},
+		{"a/fomod/ModuleConfig.xml", "fomod/../secret.xml"},
+	} {
+		f.Add(c[0], c[1])
+	}
+	f.Fuzz(func(t *testing.T, a, b string) {
+		fsys := fstest.MapFS{}
+		put := func(name string) {
+			name = strings.Trim(strings.ReplaceAll(name, "\\", "/"), "/")
+			if name == "" || !fs.ValidPath(name) {
+				return
+			}
+			fsys[name] = &fstest.MapFile{Data: []byte("<config/>")}
+		}
+		put(a)
+		put(b)
+		got, err := Find(fsys)
+		if err != nil || got == "" {
+			return
+		}
+		if !fs.ValidPath(got) || path.IsAbs(got) || slices.Contains(strings.Split(got, "/"), "..") {
+			t.Fatalf("Find escaped: %q", got)
+		}
+		if !strings.EqualFold(path.Base(got), "moduleconfig.xml") {
+			t.Fatalf("Find = %q, not a ModuleConfig.xml", got)
+		}
+		dir := path.Dir(got)
+		if !strings.EqualFold(path.Base(dir), "fomod") {
+			t.Fatalf("Find = %q, not under fomod/", got)
+		}
+		if rest := path.Dir(dir); rest != "." && path.Dir(rest) != "." {
+			t.Fatalf("Find went more than one folder down: %q", got)
+		}
+		if _, err := fs.Stat(fsys, got); err != nil {
+			t.Fatalf("Find = %q, missing: %v", got, err)
+		}
+	})
+}
+
+func FuzzGameDep(f *testing.F) {
+	for _, v := range []string{"1.6.15", "1.6.0", "1.6.15.0", "1.5.0.0", "1.6.15-beta", "v1.7.0", "not a version", "", "9.0"} {
+		f.Add(v, "1.0")
+		f.Add("1.0", v)
+		f.Add(v, v)
+	}
+	f.Fuzz(func(t *testing.T, installed, minimum string) {
+		got := gameDepOK(installed, minimum)
+		switch {
+		case minimum == "" && !got:
+			t.Fatalf("gameDepOK(%q, %q) = false, empty minimum is met", installed, minimum)
+		case installed == "" && minimum != "" && got:
+			t.Fatalf("gameDepOK(%q, %q) = true, unknown installed is unmet", installed, minimum)
+		}
+	})
+}
+
+func FuzzOpEscapes(f *testing.F) {
+	f.Add("a/b.esp", "", false)
+	f.Add("a..b/c", "", false)
+	f.Add("../x", "", false)
+	f.Add(`a\..\..\x`, "", false)
+	f.Add("/etc/passwd", "", false)
+	f.Add(`C:\x`, "", false)
+	f.Add("ok", "../../x", true)
+	f.Add("ok", "", true)
+	f.Fuzz(func(t *testing.T, source, dest string, hasDest bool) {
+		op := Op{Source: source}
+		if hasDest {
+			op.Destination = &dest
+		}
+		cfg := Config{Required: []Op{op, {Source: "safe.esp"}}}
+		ops, skipped := ResolveSafe(cfg, nil, EvalContext{})
+		for _, o := range ops {
+			if o.Escapes() {
+				t.Fatalf("ResolveSafe kept %+v", o)
+			}
+		}
+		for _, o := range skipped {
+			if !o.Escapes() {
+				t.Fatalf("ResolveSafe skipped %+v", o)
+			}
+		}
+		if n := len(Resolve(cfg, nil, EvalContext{})); len(ops)+len(skipped) != n {
+			t.Fatalf("ResolveSafe %d+%d != Resolve %d", len(ops), len(skipped), n)
+		}
 	})
 }
 
@@ -63,6 +171,7 @@ func seedModuleConfig(f *testing.F) {
 	f.Add([]byte("<config><installSteps><installStep name=\"S\"><visible>" + strings.Repeat("<dependencies>", 10001) +
 		strings.Repeat("</dependencies>", 10001) + "</visible></installStep></installSteps></config>"))
 	f.Add([]byte("<config><moduleName>Caf\xe9\x93</moduleName></config>"))
+	f.Add([]byte(`<config><requiredInstallFiles><file source="../x"/><file source="ok.esp"/></requiredInstallFiles></config>`))
 }
 
 func assertParsed(t *testing.T, cfg Config) {
@@ -79,6 +188,15 @@ func assertParsed(t *testing.T, cfg Config) {
 			ops := Resolve(cfg, ch, ctx)
 			if !slices.IsSortedFunc(ops, func(a, b Op) int { return cmpInt(a.Priority, b.Priority) }) {
 				t.Fatalf("Resolve is not sorted by priority: %+v", ops)
+			}
+			safe, skipped := ResolveSafe(cfg, ch, ctx)
+			if len(safe)+len(skipped) != len(ops) {
+				t.Fatalf("ResolveSafe %d+%d != Resolve %d", len(safe), len(skipped), len(ops))
+			}
+			for _, op := range safe {
+				if op.Escapes() {
+					t.Fatalf("ResolveSafe kept %+v", op)
+				}
 			}
 			kept := Keep(cfg, ch)
 			if again := Keep(cfg, kept); !reflect.DeepEqual(kept, again) {
