@@ -43,6 +43,8 @@ func TestParseInstallListDocumentOrder(t *testing.T) {
 	}{
 		{"folder then file", folderThenFile, []string{"A", "A/x"}},
 		{"file then folder", fileThenFolder, []string{"A/x", "A"}},
+		// Skip must keep going after an unknown child: treating a nil Skip error as fatal would drop the folder.
+		{"unknown between", `<file source="A/x" destination="A/x" priority="0"/><other/><folder source="A" destination="A" priority="0"/>`, []string{"A/x", "A"}},
 	}
 	for _, list := range lists {
 		for _, tc := range orders {
