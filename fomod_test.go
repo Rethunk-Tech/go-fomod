@@ -453,6 +453,41 @@ func TestFindPrefersTheExactNameAmongCaseVariants(t *testing.T) {
 	}
 }
 
+func TestOpenIgnoresSymlinkedConfig(t *testing.T) {
+	leak := []byte(`<config><moduleName>LEAKED</moduleName></config>`)
+	t.Run("file", func(t *testing.T) {
+		root := t.TempDir()
+		outside := filepath.Join(t.TempDir(), "secret.xml")
+		if err := os.WriteFile(outside, leak, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Mkdir(filepath.Join(root, "fomod"), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(outside, filepath.Join(root, "fomod", "ModuleConfig.xml")); err != nil {
+			t.Skip(err)
+		}
+		cfg, file, ok, err := Open(os.DirFS(root))
+		if err != nil || ok || cfg.ModuleName == "LEAKED" {
+			t.Fatalf("Open followed a symlink: %+v %q ok=%v err=%v", cfg, file, ok, err)
+		}
+	})
+	t.Run("dir", func(t *testing.T) {
+		root := t.TempDir()
+		target := t.TempDir()
+		if err := os.WriteFile(filepath.Join(target, "ModuleConfig.xml"), leak, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(target, filepath.Join(root, "fomod")); err != nil {
+			t.Skip(err)
+		}
+		cfg, file, ok, err := Open(os.DirFS(root))
+		if err != nil || ok || cfg.ModuleName == "LEAKED" {
+			t.Fatalf("Open followed a symlink: %+v %q ok=%v err=%v", cfg, file, ok, err)
+		}
+	})
+}
+
 func TestFindDepth(t *testing.T) {
 	x := &fstest.MapFile{Data: []byte("<config/>")}
 	for _, c := range []struct {

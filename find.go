@@ -44,16 +44,22 @@ func findAtDepth(fsys fs.FS, dir string, depth int) (string, error) {
 	}
 	rel, err := safefs.ResolveFold(sub, configPath)
 	if err == nil {
-		return path.Join(dir, rel), nil
-	}
-	if !errors.Is(err, fs.ErrNotExist) {
+		p := path.Join(dir, rel)
+		link, err := hasSymlink(fsys, p)
+		if err != nil {
+			return "", err
+		}
+		if !link {
+			return p, nil
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
 		return "", fmt.Errorf("fomod: %w", err)
 	}
 	if depth >= 1 {
 		return "", nil
 	}
 	for _, e := range ents {
-		if !e.IsDir() || strings.EqualFold(e.Name(), "fomod") {
+		if !e.IsDir() || e.Type()&fs.ModeSymlink != 0 || strings.EqualFold(e.Name(), "fomod") {
 			continue
 		}
 		p, err := findAtDepth(fsys, path.Join(dir, e.Name()), depth+1)
@@ -65,6 +71,41 @@ func findAtDepth(fsys fs.FS, dir string, depth int) (string, error) {
 		}
 	}
 	return "", nil
+}
+
+// hasSymlink reports a symlink in name's components. Open would follow it out of fsys.
+func hasSymlink(fsys fs.FS, name string) (bool, error) {
+	dir := "."
+	for _, elem := range strings.Split(name, "/") {
+		if elem == "." {
+			continue
+		}
+		ents, err := fs.ReadDir(fsys, dir)
+		if err != nil {
+			return false, fmt.Errorf("fomod: %w", err)
+		}
+		var ent fs.DirEntry
+		found := false
+		for _, e := range ents {
+			if e.Name() == elem {
+				ent = e
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false, nil
+		}
+		info, err := ent.Info()
+		if err != nil {
+			return false, fmt.Errorf("fomod: %w", err)
+		}
+		if info.Mode()&fs.ModeSymlink != 0 {
+			return true, nil
+		}
+		dir = path.Join(dir, elem)
+	}
+	return false, nil
 }
 
 // Open finds and parses the config in fsys. ok is false when there is none; file is the path Find returned. A config
