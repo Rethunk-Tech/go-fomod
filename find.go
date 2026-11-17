@@ -76,7 +76,7 @@ func findAtDepth(fsys fs.FS, dir string, depth int) (string, error) {
 // hasSymlink reports a symlink in name's components. Open would follow it out of fsys.
 func hasSymlink(fsys fs.FS, name string) (bool, error) {
 	dir := "."
-	for _, elem := range strings.Split(name, "/") {
+	for elem := range strings.SplitSeq(name, "/") {
 		if elem == "." {
 			continue
 		}
