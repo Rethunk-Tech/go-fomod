@@ -69,3 +69,29 @@ func opSources(ops []Op) []string {
 	}
 	return out
 }
+
+func TestParseRejectsTruncatedFileAndDependencyMarkup(t *testing.T) {
+	for _, doc := range []string{
+		`<config><requiredInstallFiles>`,
+		`<config><requiredInstallFiles><file source="x"><`,
+		`<config><requiredInstallFiles><other><`,
+		`<config><installSteps><installStep name="S"><visible>`,
+	} {
+		if _, err := Parse([]byte(doc)); err == nil {
+			t.Fatalf("parsed %q", doc)
+		}
+	}
+}
+
+func TestParseKeepsADependencyAfterAnUnknownTag(t *testing.T) {
+	cfg, err := Parse([]byte(`<config><installSteps><installStep name="S"><visible>` +
+		`<bogus/><flagDependency flag="X" value="1"/><also>x</also></visible>` +
+		`</installStep></installSteps></config>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := cfg.Steps[0].Visible.Flags
+	if len(got) != 1 || got[0].Flag != "X" || got[0].Value != "1" {
+		t.Fatalf("flags = %+v", got)
+	}
+}

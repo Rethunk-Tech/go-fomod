@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -697,3 +698,132 @@ func TestSelectAllInstallsEachPluginOfARepeatedName(t *testing.T) {
 		t.Fatalf("sources %q", got)
 	}
 }
+
+func TestFindAndOpenSurfaceFilesystemErrors(t *testing.T) {
+	boom := errors.New("boom")
+	cfg := fstest.MapFS{"fomod/ModuleConfig.xml": {Data: []byte("<config/>")}}
+
+	t.Run("unreadable root", func(t *testing.T) {
+		if _, err := Find(errFS{files: cfg, readDirAt: ".", err: boom}); err == nil {
+			t.Fatal("Find succeeded")
+		}
+	})
+	t.Run("unreadable wrapper", func(t *testing.T) {
+		fsys := errFS{files: fstest.MapFS{"pack/keep.txt": {Data: []byte("x")}}, readDirAt: "pack", err: boom}
+		if _, err := Find(fsys); err == nil {
+			t.Fatal("Find succeeded")
+		}
+	})
+	t.Run("unopenable config", func(t *testing.T) {
+		_, _, _, err := Open(errFS{files: cfg, openAt: "fomod/ModuleConfig.xml", err: boom})
+		if err == nil {
+			t.Fatal("Open succeeded")
+		}
+	})
+	t.Run("directory named as the config", func(t *testing.T) {
+		fsys := fstest.MapFS{"fomod/ModuleConfig.xml/child.txt": {Data: []byte("x")}}
+		_, _, _, err := Open(fsys)
+		if err == nil {
+			t.Fatal("Open succeeded")
+		}
+	})
+	t.Run("unstatable config", func(t *testing.T) {
+		if _, err := Find(errFS{files: cfg, infoAt: "fomod", err: boom}); err == nil {
+			t.Fatal("Find succeeded")
+		}
+	})
+	t.Run("folder name is not a valid path", func(t *testing.T) {
+		fsys := errFS{rootExtra: []fs.DirEntry{dirEnt{name: "..", mode: fs.ModeDir}}}
+		if _, err := Find(fsys); err == nil {
+			t.Fatal("Find succeeded")
+		}
+	})
+	t.Run("unreadable hop while checking for a symlink", func(t *testing.T) {
+		_, err := hasSymlink(errFS{files: cfg, readDirAt: ".", err: boom}, "fomod/ModuleConfig.xml")
+		if err == nil {
+			t.Fatal("hasSymlink succeeded")
+		}
+	})
+}
+
+func TestSymlinkWalkSkipsDotComponentsAndMissingNames(t *testing.T) {
+	fsys := fstest.MapFS{"fomod/ModuleConfig.xml": {Data: []byte("<config/>")}}
+	link, err := hasSymlink(fsys, "fomod/./ModuleConfig.xml")
+	if err != nil || link {
+		t.Fatalf("dot hop: link=%v err=%v", link, err)
+	}
+	link, err = hasSymlink(fsys, "missing/ModuleConfig.xml")
+	if err != nil || link {
+		t.Fatalf("missing: link=%v err=%v", link, err)
+	}
+}
+
+// errFS holds MapFS by field so MapFS.Sub cannot replace the wrapper.
+type errFS struct {
+	files     fstest.MapFS
+	readDirAt string
+	openAt    string
+	infoAt    string
+	rootExtra []fs.DirEntry
+	err       error
+}
+
+func (f errFS) Open(name string) (fs.File, error) {
+	if f.openAt != "" && name == f.openAt {
+		return nil, f.err
+	}
+	if f.files == nil {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+	}
+	return f.files.Open(name)
+}
+
+func (f errFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if f.readDirAt != "" && name == f.readDirAt {
+		return nil, f.err
+	}
+	var ents []fs.DirEntry
+	if f.files != nil {
+		var err error
+		ents, err = f.files.ReadDir(name)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if f.infoAt != "" {
+		for i, e := range ents {
+			p := e.Name()
+			if name != "." {
+				p = name + "/" + p
+			}
+			if p == f.infoAt {
+				ents[i] = infoEnt{e, f.err}
+			}
+		}
+	}
+	if name == "." {
+		ents = append(ents, f.rootExtra...)
+	}
+	return ents, nil
+}
+
+type infoEnt struct {
+	fs.DirEntry
+	err error
+}
+
+func (e infoEnt) Info() (fs.FileInfo, error) { return nil, e.err }
+
+type dirEnt struct {
+	name string
+	mode fs.FileMode
+}
+
+func (d dirEnt) Name() string               { return d.name }
+func (d dirEnt) IsDir() bool                { return d.mode.IsDir() }
+func (d dirEnt) Type() fs.FileMode          { return d.mode.Type() }
+func (d dirEnt) Info() (fs.FileInfo, error) { return d, nil }
+func (d dirEnt) Size() int64                { return 0 }
+func (d dirEnt) Mode() fs.FileMode          { return d.mode }
+func (d dirEnt) ModTime() time.Time         { return time.Time{} }
+func (d dirEnt) Sys() any                   { return nil }
