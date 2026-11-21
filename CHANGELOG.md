@@ -6,6 +6,22 @@ Notable changes to `go-fomod`. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A symlinked `ModuleConfig.xml` is ignored.
+
+## [0.2.0] - 2026-11-12
+
+### Added
+
+- `Op.Escapes` marks a path operand that leaves the root, and `ResolveSafe` returns the operations that escape separately.
+
+### Fixed
+
+- `Parse` refuses documents with more markup than any real config, and keeps equal-priority file and folder operations in document order.
+- `Resolve` installs every plugin of a `SelectAll` group that repeats a name.
+- `Unanswered` judges a step's visibility where the installer reaches it.
+
 ## [0.1.2] - 2026-11-07
 
 ### Fixed
@@ -30,7 +46,8 @@ Notable changes to `go-fomod`. The format follows
 - `Resolve` lists the file and folder operations for a set of `Choices`; `Match`, `Unanswered` and `Keep` replay
   recorded choices against a changed config.
 
-[Unreleased]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Rethunk-Tech/go-fomod/releases/tag/v0.1.0
