@@ -69,7 +69,7 @@ linters:
     # canon go-golangci-lint-00017
     gocognit:
       min-complexity: 30
-    # canon go-golangci-lint-00002; the deviation is declared in canon.toml
+    # local rule beyond canon: the module takes an fs.FS and touches no OS path
     depguard:
       rules:
         no-os-paths:
