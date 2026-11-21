@@ -221,7 +221,7 @@ func TestRequiredPluginNotUsableUnderFlagsMatches(t *testing.T) {
 }
 
 func TestLargeGroupIsLinear(t *testing.T) {
-	perOp := func(n int) float64 {
+	allocs := func(n int) float64 {
 		g := Group{Name: "G", Type: SelectAny}
 		names := make([]string, n)
 		for i := range n {
@@ -236,25 +236,16 @@ func TestLargeGroupIsLinear(t *testing.T) {
 		if got := len(Resolve(cfg, choices, EvalContext{})); got != n {
 			t.Fatalf("ops = %d", got)
 		}
-		best := math.Inf(1)
-		for range 3 {
-			r := testing.Benchmark(func(b *testing.B) {
-				for b.Loop() {
-					Match(cfg, choices, EvalContext{})
-					Resolve(cfg, choices, EvalContext{})
-				}
-			})
-			best = min(best, float64(r.T)/float64(r.N))
-		}
-		return best
+		return testing.AllocsPerRun(3, func() {
+			Match(cfg, choices, EvalContext{})
+			Resolve(cfg, choices, EvalContext{})
+		})
 	}
-	// A ratio rather than a wall-clock limit, so a loaded runner passes: 8x the plugins costs about 8x when linear
-	// and 64x when quadratic. testing.Benchmark collects garbage before timing and averages over many runs, so the
-	// setup's garbage does not count against the larger size, and the fastest of three samples discards a stall, which a
-	// 40000-plugin run under -race on a shared runner hits often enough to read 27x for linear code.
-	small, large := perOp(5000), perOp(40000)
-	if ratio := large / small; ratio > 24 {
-		t.Fatalf("8x the plugins took %.1fx as long (%.0fns vs %.0fns per run)", ratio, large, small)
+	// Allocations, not time, so machine load cannot move the result: 8x the plugins costs about 8x the allocations when
+	// linear and 64x when something is rebuilt per plugin.
+	small, large := allocs(1000), allocs(8000)
+	if ratio := large / small; ratio > 12 {
+		t.Fatalf("8x the plugins made %.1fx the allocations (%.0f vs %.0f per run)", ratio, large, small)
 	}
 }
 
