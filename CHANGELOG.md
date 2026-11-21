@@ -6,6 +6,8 @@ Notable changes to `go-fomod`. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-21
+
 ### Fixed
 
 - A symlinked `ModuleConfig.xml` is ignored.
@@ -46,7 +48,8 @@ Notable changes to `go-fomod`. The format follows
 - `Resolve` lists the file and folder operations for a set of `Choices`; `Match`, `Unanswered` and `Keep` replay
   recorded choices against a changed config.
 
-[Unreleased]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Rethunk-Tech/go-fomod/compare/v0.1.0...v0.1.1
